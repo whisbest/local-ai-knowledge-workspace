@@ -55,11 +55,17 @@ def create_app(root=None, worker=True):
     def save_settings(body:dict):
         with store.session() as s:
             r=s.get(Record,'preferences'); previous=load(r.payload);values={**previous,**body}
+            if set(body)-set(previous):raise AppError('SETTINGS','包含不支持的设置。')
+            if not isinstance(values['chunk_length'],int) or not isinstance(values['chunk_overlap'],int):raise AppError('CHUNK_SETTINGS','切片参数必须为整数。')
+            if values['answer_length'] not in ('short','normal','long') or not isinstance(values['source_panel'],bool):raise AppError('SETTINGS','回答长度或来源面板设置不合法。')
             if not (1 <= values['chunk_length'] <= 12000 and 0 <= values['chunk_overlap'] < values['chunk_length']): raise AppError('CHUNK_SETTINGS','切片长度必须为正，重叠必须小于切片长度。')
             from .indexes import changed_indexes
             from .models_service import config_for
             for purpose in ('chat','embedding'):
                 if values.get('default_'+purpose):config_for(store,values['default_'+purpose],purpose)
+            if values.get('default_kb'):
+                from .documents import require
+                require(s,values['default_kb'],'kb')
             changed_indexes(s,values,previous)
             r.payload=dump(values); r.updated_at=now()
             return values
@@ -102,6 +108,8 @@ def create_app(root=None, worker=True):
     mount_indexes(app,store)
     from .chat import mount_chat
     mount_chat(app,store)
+    from .data_service import mount_data
+    mount_data(app,store)
     return app
 
 app = create_app()
