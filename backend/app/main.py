@@ -3,12 +3,17 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from .core import Store, Record, Job, AppError, dump, load, record_data, job_data, now
 
 
 class NameBody(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    @field_validator('name')
+    @classmethod
+    def nonblank(cls,value):
+        if not value.strip(): raise ValueError('名称不能为空。')
+        return value.strip()
 
 
 def create_app(root=None, worker=True):
@@ -16,7 +21,11 @@ def create_app(root=None, worker=True):
     @asynccontextmanager
     async def lifespan(app):
         store.recover()
+        from .worker import Worker
+        runner=Worker(store)
+        if worker: runner.start()
         yield
+        if worker: runner.stop()
         store.engine.dispose()
     app = FastAPI(title='个人知识库', lifespan=lifespan)
     app.state.store, app.state.worker_enabled = store, worker
@@ -80,6 +89,8 @@ def create_app(root=None, worker=True):
             docs=s.query(Record).filter(Record.kind=='document',Record.state!='deleted').all()
             conversations=s.query(Record).filter_by(kind='conversation',state='active').order_by(Record.updated_at.desc()).limit(5).all()
             return {'knowledge_bases':s.query(Record).filter_by(kind='kb',state='active').count(),'documents':len(docs),'ready':sum(r.state=='ready' for r in docs),'processing':sum(r.state in ['queued','parsing','chunking','embedding'] for r in docs),'failed':sum(r.state in ['failed','interrupted'] for r in docs),'recent_documents':[record_data(r) for r in sorted(docs,key=lambda r:r.created_at,reverse=True)[:5]],'recent_conversations':[record_data(r) for r in conversations]}
+    from .models_service import mount_models
+    mount_models(app,store)
     return app
 
 app = create_app()

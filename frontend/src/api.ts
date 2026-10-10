@@ -1,0 +1,1 @@
+export async function api(path:string,options:RequestInit={}) {const r=await fetch('/api'+path,{...options,headers:{...(options.body instanceof FormData?{}:{'Content-Type':'application/json'}),...options.headers}});if(!r.ok){let e;try{e=await r.json()}catch{e={message:'服务暂不可用'}}throw new Error(e.message||e.detail||'请求失败')}return r.status===204?null:r.json()}
