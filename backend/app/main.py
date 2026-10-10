@@ -100,6 +100,8 @@ def create_app(root=None, worker=True):
     mount_documents(app,store)
     from .indexes import mount_indexes
     mount_indexes(app,store)
+    from .chat import mount_chat
+    mount_chat(app,store)
     return app
 
 app = create_app()

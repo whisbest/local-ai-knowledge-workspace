@@ -22,6 +22,9 @@ class Worker:
             with self.store.session() as s:kind=s.get(Job,id).kind
             if kind=='pull':execute_pull(self.store,id)
             elif kind=='process':execute_process(self.store,id)
+            elif kind=='generation':
+                from .chat import execute_generation
+                execute_generation(self.store,id)
             else:raise AppError('JOB_KIND','不支持的任务类型。')
         except Exception as e:
             with self.store.session() as s:

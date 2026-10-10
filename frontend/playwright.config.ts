@@ -1,0 +1,3 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'../tests/e2e',workers:1,timeout:60000,use:{baseURL:'http://127.0.0.1:18767',channel:'msedge',trace:'retain-on-failure',screenshot:'only-on-failure'},reporter:[['list'],['html',{outputFolder:'../.reports/playwright',open:'never'}]],webServer:[{command:'"..\\.venv\\Scripts\\python.exe" -m uvicorn e2e_server:app --app-dir ../tests --host 127.0.0.1 --port 18768',url:'http://127.0.0.1:18768/api/health',reuseExistingServer:false},{command:'npm run dev -- --port 18767 --strictPort',url:'http://127.0.0.1:18767',env:{TEST_API_PORT:'18768'},reuseExistingServer:false}]});
+

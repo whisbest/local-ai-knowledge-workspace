@@ -130,6 +130,9 @@ class Store:
                 if d and d.kind=='document' and d.state!='deleted':d.state='interrupted'
             for record in s.query(Record).filter(Record.kind=='generation', Record.state.in_(['queued','retrieving','generating'])):
                 record.state = 'interrupted'
+                payload=load(record.payload)
+                message=s.get(Record,payload.get('assistant_message_id'))
+                if message:message.state='interrupted'
 
     def claim(self, kind=None):
         with self.engine.connect() as conn:
