@@ -91,6 +91,8 @@ def create_app(root=None, worker=True):
             return {'knowledge_bases':s.query(Record).filter_by(kind='kb',state='active').count(),'documents':len(docs),'ready':sum(r.state=='ready' for r in docs),'processing':sum(r.state in ['queued','parsing','chunking','embedding'] for r in docs),'failed':sum(r.state in ['failed','interrupted'] for r in docs),'recent_documents':[record_data(r) for r in sorted(docs,key=lambda r:r.created_at,reverse=True)[:5]],'recent_conversations':[record_data(r) for r in conversations]}
     from .models_service import mount_models
     mount_models(app,store)
+    from .documents import mount_documents
+    mount_documents(app,store)
     return app
 
 app = create_app()

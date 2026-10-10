@@ -2,6 +2,7 @@ from __future__ import annotations
 import threading
 from .core import Job, AppError
 from .models_service import execute_pull
+from .documents import execute_process
 
 
 class Worker:
@@ -13,12 +14,20 @@ class Worker:
     def loop(self):
         while not self.stop_event.is_set():
             if self.store.locked:self.stop_event.wait(.2);continue
-            id=self.store.claim('pull')
+            id=self.store.claim()
             if not id:self.stop_event.wait(.2);continue
             self.execute(id)
     def execute(self,id):
-        try:execute_pull(self.store,id)
+        try:
+            with self.store.session() as s:kind=s.get(Job,id).kind
+            if kind=='pull':execute_pull(self.store,id)
+            elif kind=='process':execute_process(self.store,id)
+            else:raise AppError('JOB_KIND','不支持的任务类型。')
         except Exception as e:
             with self.store.session() as s:
                 j=s.get(Job,id)
                 if j and j.state=='running':j.state='failed';j.error=e.message if isinstance(e,AppError) else '任务执行失败，请重试。';j.stage='failed'
+                if j and j.kind=='process':
+                    from .core import Record
+                    d=s.get(Record,j.target)
+                    if d and d.state!='deleted' and j.state=='failed':d.state='failed'
