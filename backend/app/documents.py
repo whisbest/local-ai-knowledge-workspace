@@ -71,6 +71,12 @@ def execute_process(store,id):
         tmp=store.current/(parsed_path+'.tmp');tmp.write_text(dump(result),encoding='utf8');os.replace(tmp,store.current/parsed_path)
         v.payload=dump({**load(v.payload),'parsed_path':parsed_path,'warnings':result['warnings'],'chunk_profile':{'length':settings['chunk_length'],'overlap':settings['chunk_overlap']}});v.state='parsed'
         doc.state='parsed';job.state='completed';job.stage='parsed';job.done=job.total;job.updated_at=now()
+        if settings.get('default_embedding'):
+            # The same persistent job continues into indexing after the parsing transaction commits.
+            job.state='running'
+    if settings.get('default_embedding'):
+        from .indexes import execute_index
+        execute_index(store,id)
 
 
 def mount_documents(app,store):

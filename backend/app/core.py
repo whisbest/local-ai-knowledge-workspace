@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import os
+import threading
 from pathlib import Path
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -86,6 +87,7 @@ class Store:
         self.root = Path(root).resolve()
         self.current = self.root / 'state/current'
         self.locked = False
+        self.model_lock = threading.RLock()
         self.initialize()
 
     def initialize(self):
@@ -124,6 +126,8 @@ class Store:
         with self.session() as s:
             for job in s.query(Job).filter(Job.state.in_(['running'])):
                 job.state, job.stage, job.error, job.lease = 'interrupted', 'interrupted', '服务停止导致任务中断，请重试。', None
+                d=s.get(Record,job.target)
+                if d and d.kind=='document' and d.state!='deleted':d.state='interrupted'
             for record in s.query(Record).filter(Record.kind=='generation', Record.state.in_(['queued','retrieving','generating'])):
                 record.state = 'interrupted'
 

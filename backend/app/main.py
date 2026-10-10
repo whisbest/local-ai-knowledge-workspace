@@ -54,8 +54,13 @@ def create_app(root=None, worker=True):
     @app.put('/api/settings')
     def save_settings(body:dict):
         with store.session() as s:
-            r=s.get(Record,'preferences'); values=load(r.payload); values.update(body)
+            r=s.get(Record,'preferences'); previous=load(r.payload);values={**previous,**body}
             if not (1 <= values['chunk_length'] <= 12000 and 0 <= values['chunk_overlap'] < values['chunk_length']): raise AppError('CHUNK_SETTINGS','切片长度必须为正，重叠必须小于切片长度。')
+            from .indexes import changed_indexes
+            from .models_service import config_for
+            for purpose in ('chat','embedding'):
+                if values.get('default_'+purpose):config_for(store,values['default_'+purpose],purpose)
+            changed_indexes(s,values,previous)
             r.payload=dump(values); r.updated_at=now()
             return values
 
@@ -93,6 +98,8 @@ def create_app(root=None, worker=True):
     mount_models(app,store)
     from .documents import mount_documents
     mount_documents(app,store)
+    from .indexes import mount_indexes
+    mount_indexes(app,store)
     return app
 
 app = create_app()

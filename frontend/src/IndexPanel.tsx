@@ -1,0 +1,5 @@
+import {useState} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {api} from './api';
+import {states} from './Documents';
+export default function IndexPanel(){const qc=useQueryClient();const [notice,setNotice]=useState('');const [selected,setSelected]=useState<string[]>([]);const q=useQuery({queryKey:['indexes'],queryFn:()=>api('/indexes/impact'),refetchInterval:2000});return <section className="panel"><h2>向量索引</h2><p>当前 {q.data?.total||0} 份文档，{q.data?.vectors||0} 条向量。变更向量模型或切片规则后，受影响资料需要重建。</p>{notice&&<div role="status" className="notice">{notice}</div>}{q.data?.documents.map((d:any)=><label className="check" key={d.id}><input type="checkbox" checked={selected.includes(d.id)} onChange={e=>setSelected(e.target.checked?[...selected,d.id]:selected.filter(i=>i!==d.id))}/>{d.name} · {states[d.state]}</label>)}<button disabled={!selected.length} onClick={async()=>{try{await api('/indexes/rebuild',{method:'POST',body:JSON.stringify({document_ids:selected})});qc.invalidateQueries();setNotice('重建任务已加入队列')}catch(e){setNotice((e as Error).message)}}}>重建选中文档</button></section>}
