@@ -1,0 +1,29 @@
+name: local-knowledge-qa
+services:
+  api:
+    build: ./backend
+    image: local-knowledge-qa-api:v1
+    environment:
+      DATA_ROOT: /data
+      HOST_DATA_PATH: ${DATA_PATH:-./data}
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+    mem_limit: 768m
+    cpus: 2
+    stop_grace_period: 30s
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  web:
+    build: ./frontend
+    image: local-knowledge-qa-web:v1
+    ports:
+      - 127.0.0.1:${APP_PORT:-18765}:80
+    mem_limit: 128m
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
