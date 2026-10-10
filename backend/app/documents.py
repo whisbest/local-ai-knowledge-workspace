@@ -19,6 +19,7 @@ def require(s,id,kind):
 
 
 def new_job(s,doc,version,kind='process'):
+    if s.query(Job).filter(Job.state.in_(['queued','running'])).count()>=50:raise AppError('QUEUE_LIMIT','待执行任务已达到 50 个，请等待或取消后再提交。',409)
     for old in s.query(Job).filter(Job.target==doc.id,Job.state.in_(['queued','running'])):old.state='cancelled';old.stage='cancelled'
     j=Job(kind=kind,target=doc.id,payload=dump({'version_id':version.id}));s.add(j)
     doc.state='queued';doc.updated_at=now();s.flush();return j
@@ -75,8 +76,8 @@ def execute_process(store,id):
             # The same persistent job continues into indexing after the parsing transaction commits.
             job.state='running'
     if settings.get('default_embedding'):
-        from .indexes import execute_index
-        execute_index(store,id)
+        # The worker performs the embedding continuation; tests and jobs share this boundary.
+        return
 
 
 def mount_documents(app,store):
@@ -86,7 +87,7 @@ def mount_documents(app,store):
         if page<1 or not 1<=page_size<=100:raise AppError('PAGE','分页参数不合法。')
         with store.session() as s:
             rows=[record_data(r) for r in s.query(Record).filter(Record.kind=='document',Record.state!='deleted').order_by(Record.created_at.desc())]
-            rows=[r for r in rows if (not kbId or r['kb_id']==kbId) and (not status or r['state']==status) and (not format or r['format']==format) and q.casefold() in r['name'].casefold()]
+            rows=[r for r in rows if (not kbId or r['kb_id']==kbId) and (not status or r['state'] in status.split(',')) and (not format or r['format']==format) and q.casefold() in r['name'].casefold()]
             return {'items':rows[(page-1)*page_size:page*page_size],'total':len(rows),'page':page,'page_size':page_size}
 
     @router.post('/documents/upload')
@@ -131,6 +132,7 @@ def mount_documents(app,store):
                     doc.payload=dump({'kb_id':kb_id,'name':name,'format':format,'size':size,'checksum':checksum,'current_version_id':version.id,'version':number});job=new_job(s,doc,version)
                     results.append({'name':name,'state':'queued','document_id':doc.id,'job_id':job.id})
             except AppError as e:results.append({'name':file.filename,'state':'failed','code':e.code,'error':e.message})
+            except OSError:results.append({'name':file.filename,'state':'failed','code':'FILE_IO','error':'文件保存失败，请检查磁盘空间与目录权限。'})
             finally:staging.unlink(missing_ok=True);await file.close()
         with store.session() as s:s.add(Idempotency(key='upload:'+request_key,result=dump(results)))
         return results
@@ -193,6 +195,7 @@ def mount_documents(app,store):
         with store.session() as s:
             old=s.get(Job,id)
             if not old or old.state not in ('failed','interrupted','cancelled'):raise AppError('JOB_STATE','该任务无需重试。',409)
+            if old.attempt>=5:raise AppError('RETRY_LIMIT','同一任务已尝试 5 次，请检查原因后重新处理文档或重新下载。')
             if old.kind=='pull':
                 j=Job(kind=old.kind,target=old.target,payload=old.payload,attempt=old.attempt+1);s.add(j);s.flush()
             else:

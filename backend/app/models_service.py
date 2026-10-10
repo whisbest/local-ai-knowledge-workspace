@@ -16,6 +16,9 @@ class ModelBody(BaseModel):
     name: str = Field(default='',max_length=100)
     key: str | None = Field(default=None,max_length=2048)
 
+class KeyBody(BaseModel):
+    key: str=Field(min_length=1,max_length=2048)
+
 
 def config_for(store, id, purpose=None):
     with store.session() as s:
@@ -65,9 +68,20 @@ def mount_models(app,store):
         (store.root/'secrets'/id).unlink(missing_ok=True)
         return {'removed':True}
 
+    @router.put('/model-configs/{id}/key')
+    def replace_key(id:str,body:KeyBody):
+        c=config_for(store,id)
+        if c['mode']!='api':raise AppError('MODEL_MODE','本地配置不使用 API 密钥。')
+        path=store.root/'secrets'/id;temp=path.with_suffix('.tmp')
+        temp.write_text(body.key,encoding='utf8');temp.chmod(0o600);temp.replace(path)
+        with store.session() as s:
+            r=s.get(Record,id);p=load(r.payload);p.pop('restored_without_key',None);p['test_status']='untested';r.payload=dump(p)
+        return {'key_present':True}
+
     @router.post('/model-configs/{id}/test')
     def test(id:str):
         c=config_for(store,id);p=provider_for(store,id)
+        store.model_lock.acquire()
         try:
             result={}
             if c['mode']=='local':
@@ -82,13 +96,18 @@ def mount_models(app,store):
                 if not answer: raise AppError('MODEL_RESPONSE','回答接口没有返回文字。',502)
             result['test_status']='available';result['tested_at']=now()
             with store.session() as s:
-                r=s.get(Record,id);r.payload=dump({**load(r.payload),**result})
+                r=s.get(Record,id);previous=load(r.payload);r.payload=dump({**previous,**result})
+                if c['purpose']=='embedding' and previous.get('fingerprint') and previous['fingerprint']!=result['fingerprint']:
+                    for index in s.query(Record).filter_by(kind='index',state='active'):
+                        if load(index.payload)['model_config_id']==id:
+                            index.state='stale';document=s.get(Record,index.parent_id)
+                            if document and document.state!='deleted':document.state='needs_rebuild'
             return result
         except AppError as e:
             with store.session() as s:
                 r=s.get(Record,id);r.payload=dump({**load(r.payload),'test_status':'failed','test_error':e.message})
             raise
-        finally: p.close()
+        finally: p.close();store.model_lock.release()
 
     @router.get('/local-models')
     def local_models(endpoint:str='http://host.docker.internal:11434'):
@@ -103,6 +122,7 @@ def mount_models(app,store):
         if not re.fullmatch(r'[\w./:@+\-]{1,180}',model): raise AppError('MODEL_NAME','模型名不合法。')
         endpoint=normalize_endpoint(body.get('endpoint','http://host.docker.internal:11434'),'local')
         with store.session() as s:
+            if s.query(Job).filter(Job.state.in_(['queued','running'])).count()>=50:raise AppError('QUEUE_LIMIT','待执行任务达到 50 个，请稍后下载。',409)
             j=Job(kind='pull',target=model,payload=dump({'endpoint':endpoint}));s.add(j);s.flush();return {'id':j.id}
     app.include_router(router)
 

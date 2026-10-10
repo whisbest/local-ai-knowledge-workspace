@@ -29,7 +29,7 @@ def safe_remove(store,path):
 @contextmanager
 def maintenance(store):
     with store.gate:
-        if store.locked or store.request_count>1:raise AppError('BUSY','其他请求正在进行，请稍后再试。',409)
+        if store.locked or store.request_count>1 or store.inflight_workers:raise AppError('BUSY','其他请求或任务正在进行，请稍后再试。',409)
         store.locked=True
     try:
         with store.session() as s:
@@ -59,7 +59,7 @@ def snapshot(store,label='manual'):
         for folder in ('documents','parsed'):
             shutil.copytree(store.current/folder,temporary/folder)
         files={str(p.relative_to(temporary)).replace('\\','/'):{'sha256':sha(p),'size':p.stat().st_size} for p in temporary.rglob('*') if p.is_file()}
-        manifest={'format_version':FORMAT_VERSION,'schema_revision':'0001','created_at':now(),'label':label,'files':files,'models':models,'excluded':['API keys','model weights','logs','temporary files','other backups']}
+        manifest={'format_version':FORMAT_VERSION,'schema_revision':'0002','created_at':now(),'label':label,'files':files,'models':models,'excluded':['API keys','model weights','logs','temporary files','other backups']}
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('manifest.json',dump(manifest))
             for relative in files:archive.write(temporary/relative,relative)
@@ -73,7 +73,8 @@ def validate_relations(path):
         conn=sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)
         conn.execute('PRAGMA trusted_schema=OFF')
         if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError()
-        if conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]!='0001':raise AppError('BACKUP_VERSION','备份数据库版本不兼容。')
+        if conn.execute('SELECT version_num FROM alembic_version').fetchone()[0] not in ('0001','0002'):raise AppError('BACKUP_VERSION','备份数据库版本不兼容。')
+        if conn.execute('PRAGMA foreign_key_check').fetchall():raise ValueError()
         rows={id:{'kind':kind,'parent':parent,'state':state,'payload':load(payload)} for id,kind,parent,state,payload in conn.execute('SELECT id,kind,parent_id,state,payload FROM records')}
         required={'records','vectors','jobs','idempotency','stream_events','alembic_version'}
         if not required.issubset({r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}):raise ValueError()

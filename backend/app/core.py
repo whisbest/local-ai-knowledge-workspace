@@ -90,6 +90,7 @@ class Store:
         self.model_lock = threading.RLock()
         self.gate = threading.Lock()
         self.request_count = 0
+        self.inflight_workers = 0
         self.recover_files()
         self.initialize()
 
@@ -147,6 +148,11 @@ class Store:
                 payload=load(record.payload)
                 message=s.get(Record,payload.get('assistant_message_id'))
                 if message:message.state='interrupted'
+            for index in s.query(Record).filter_by(kind='index',state='building'):
+                index.state='failed';s.query(Vector).filter_by(generation_id=index.id).delete()
+        from .documents import cleanup_files
+        with self.session() as s:
+            cleanup_files(self,[r for r in s.query(Record).filter_by(kind='version',state='deleted')])
 
     def claim(self, kind=None):
         with self.gate:
@@ -156,7 +162,7 @@ class Store:
     def _claim(self, kind=None):
         with self.engine.connect() as conn:
             conn.exec_driver_sql('BEGIN IMMEDIATE')
-            row = conn.execute(text('SELECT id FROM jobs WHERE state=:state' + (' AND kind=:kind' if kind else '') + ' ORDER BY created_at LIMIT 1'), {'state':'queued', 'kind':kind}).first()
+            row = conn.execute(text('SELECT id FROM jobs WHERE state=:state' + (' AND kind=:kind' if kind else '') + " ORDER BY CASE kind WHEN 'generation' THEN 0 ELSE 1 END, created_at LIMIT 1"), {'state':'queued', 'kind':kind}).first()
             if row:
                 conn.execute(text("UPDATE jobs SET state='running',lease=:lease,updated_at=:updated WHERE id=:id AND state='queued'"), {'id':row[0], 'lease':uid(), 'updated':now()})
             conn.commit()

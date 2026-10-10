@@ -32,10 +32,10 @@ def execute_index(store,id):
         if not chunks:raise AppError('NO_CHUNKS','请先解析文档。')
         profile=load(v.payload)['chunk_profile'];prefs=load(s.get(Record,'preferences').payload)
         if profile!={'length':prefs['chunk_length'],'overlap':prefs['chunk_overlap']}:raise AppError('CHUNK_CHANGED','切片设置已变化，请重新处理文档。')
+        invalidate(s,d)
         generation=Record(id=uid(),kind='index',parent_id=doc_id,state='building',payload=dump({'version_id':version_id,'fingerprint':config['fingerprint'],'dimension':config['dimension'],'profile':profile,'model_config_id':config['id']}));s.add(generation);generation_id=generation.id
         j.stage='embedding';j.total=len(chunks);j.done=0;d.state='embedding'
         # No old index is usable while rebuilding the same version.
-        invalidate(s,d)
     p=provider_for(store,config['id'],'embedding')
     try:
         with store.model_lock:
@@ -52,6 +52,8 @@ def execute_index(store,id):
                         vector=np.asarray(vector,dtype=np.float32);vector/=np.linalg.norm(vector)
                         s.add(Vector(document_id=doc_id,version_id=version_id,generation_id=generation_id,fingerprint=config['fingerprint'],dimension=config['dimension'],chunk_id=chunk['id'],values=dump(vector.tolist())))
                     j.done=offset+len(batch);j.updated_at=now()
+                # Small batches yield to queued questions without loading models concurrently.
+                if getattr(store,'worker_runner',None):store.worker_runner.questions_at_boundary()
         with store.session() as s:
             j=s.get(Job,id);d=s.get(Record,doc_id);prefs=load(s.get(Record,'preferences').payload)
             if j.state!='running' or d.state=='deleted' or load(d.payload)['current_version_id']!=version_id:return
@@ -102,6 +104,8 @@ def retrieve(store,question,scope=None,top_k=5):
         for score,chunk_id,doc_id,version_id,generation_id in best:
             # Validate again after inference: delete/replace may have run while query embedding was in progress.
             s.expire_all();d=s.get(Record,doc_id);idx=s.get(Record,generation_id);chunk=s.get(Record,chunk_id)
+            preferences=load(s.get(Record,'preferences').payload)
+            if preferences['default_embedding']!=config['id']:raise AppError('CONFIG_CHANGED','检索期间向量配置已切换，请重新提问。',409)
             if not d or d.state!='ready' or load(d.payload)['current_version_id']!=version_id or not idx or idx.state!='active' or not chunk:continue
             payload=load(chunk.payload);items.append({'chunk_id':chunk_id,'document_id':doc_id,'version_id':version_id,'score':score,'file_name':load(d.payload)['name'],'format':load(d.payload)['format'],'text':payload['text'],'source_spans':payload['source_spans']})
     return {'items':items,'warnings':warnings,'elapsed_ms':(time.perf_counter()-started)*1000}

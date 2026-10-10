@@ -10,7 +10,13 @@ class Worker:
     def __init__(self,store):
         self.store=store;self.stop_event=threading.Event();self.thread=threading.Thread(target=self.loop,daemon=True)
     def start(self):self.thread.start()
-    def stop(self):self.stop_event.set();self.thread.join(timeout=2)
+    def questions_at_boundary(self):
+        id=self.store.claim('generation')
+        if id:self.execute(id)
+    def stop(self):
+        self.stop_event.set()
+        self.store.recover()
+        self.thread.join(timeout=3)
     def loop(self):
         while not self.stop_event.is_set():
             if self.store.locked:self.stop_event.wait(.2);continue
@@ -18,10 +24,16 @@ class Worker:
             if not id:self.stop_event.wait(.2);continue
             self.execute(id)
     def execute(self,id):
+        with self.store.gate:self.store.inflight_workers+=1
         try:
             with self.store.session() as s:kind=s.get(Job,id).kind
             if kind=='pull':execute_pull(self.store,id)
-            elif kind=='process':execute_process(self.store,id)
+            elif kind=='process':
+                execute_process(self.store,id)
+                with self.store.session() as s:current=s.get(Job,id);in_progress=current and current.state=='running'
+                if in_progress:
+                    from .indexes import execute_index
+                    execute_index(self.store,id)
             elif kind=='generation':
                 from .chat import execute_generation
                 execute_generation(self.store,id)
@@ -34,3 +46,5 @@ class Worker:
                     from .core import Record
                     d=s.get(Record,j.target)
                     if d and d.state!='deleted' and j.state=='failed':d.state='failed'
+        finally:
+            with self.store.gate:self.store.inflight_workers-=1

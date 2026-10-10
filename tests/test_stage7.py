@@ -32,6 +32,10 @@ def test_complete_backup_restore_without_secrets(tmp_path):
         assert c.get('/api/generations/'+g+'/sources').json()[0]['text']
         assert c.get('/api/indexes/impact').json()['vectors']>0
         assert all(not m['key_present'] for m in c.get('/api/model-configs').json())
+        embedding=next(m for m in c.get('/api/model-configs').json() if m['purpose']=='embedding')
+        assert c.post('/api/model-configs/'+embedding['id']+'/test').json()['code']=='MISSING_KEY'
+        assert c.put('/api/model-configs/'+embedding['id']+'/key',json={'key':'new-private'}).status_code==200
+        assert 'new-private' not in c.get('/api/model-configs').text
         assert c.get('/api/backups/'+result.json()['pre_restore_backup']+'/download').status_code==200
 
 def test_invalid_archive_checksum_version_and_traversal_preserve_data(tmp_path):

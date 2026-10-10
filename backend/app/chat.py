@@ -27,6 +27,7 @@ def begin_generation(store,conversation_id,body,regeneration=None):
             result=load(previous.result)
             if result['conversation_id']!=conversation_id:raise AppError('REQUEST_KEY','请求标识已用于另一对话。',409)
             return result
+        if s.query(Job).filter(Job.state.in_(['queued','running'])).count()>=50:raise AppError('QUEUE_LIMIT','任务队列已满，请等待完成或取消任务。',409)
         prefs=load(s.get(Record,'preferences').payload);model_id=body.get('model_id') or prefs['default_chat']
         if not model_id:raise AppError('CHAT_CONFIG','请先配置并选择回答模型。')
         config=config_for(store,model_id,'chat')
@@ -53,7 +54,11 @@ def execute_generation(store,job_id):
             g=s.get(Record,job.target)
             if g.state in TERMINAL:return
             for i,item in enumerate(result['items']):
-                snapshot=Record(id=uid(),kind='source',parent_id=g.id,payload=dump({**item,'citation_number':i+1}));s.add(snapshot);sources.append({**item,'id':snapshot.id,'citation_number':i+1})
+                d=s.get(Record,item['document_id'])
+                if not d or d.state!='ready' or load(d.payload)['current_version_id']!=item['version_id']:continue
+                number=len(sources)+1
+                snapshot=Record(id=uid(),kind='source',parent_id=g.id,payload=dump({**item,'citation_number':number}));s.add(snapshot);sources.append({**item,'id':snapshot.id,'citation_number':number})
+            gp_now=load(g.payload);gp_now['retrieval_warnings']=result['warnings'];g.payload=dump(gp_now)
             event(s,g,'sources',{'items':sources,'warnings':result['warnings']});g.state='generating';event(s,g,'status',{'state':'generating'})
             history=[load(r.payload)['content'] for r in s.query(Record).filter_by(kind='message',parent_id=g.parent_id).order_by(Record.created_at) if load(r.payload).get('role')=='user' and r.id!=gp['user_message_id']][-3:]
         def cancelled():
@@ -84,7 +89,7 @@ def execute_generation(store,job_id):
             if g.state in TERMINAL:j.state='completed';return
             m=s.get(Record,gp['assistant_message_id']);answer=load(m.payload)['content']
             numbers={int(n) for n in re.findall(r'\[(\d+)\]',answer)}
-            if not answer:raise AppError('EMPTY_ANSWER','模型未返回回答，请重试。')
+            if not re.sub(r'\[\d+\]','',answer).strip():raise AppError('EMPTY_ANSWER','模型没有提供有效回答文字，请重新生成。')
             if not numbers.issubset(set(range(1,len(sources)+1))):raise AppError('INVALID_CITATION','回答包含不存在的引用编号，请重新生成。')
             if sources and not numbers and not any(t in answer for t in ('不足','没有','未提供','无法','未提及')):raise AppError('MISSING_CITATION','模型未为回答提供来源，请重新生成。')
             g.state='completed';m.state='completed';j.state='completed';j.stage='completed';event(s,g,'done',{'state':'completed'})

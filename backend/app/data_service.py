@@ -31,6 +31,7 @@ def mount_data(app,store):
     @router.post('/clear')
     def clear(body:dict):
         category=body.get('category')
+        if store.inflight_workers:raise AppError('BUSY','任务尚未停止，请稍后重新预览。',409)
         if body.get('token')!=clear_preview(store,category)['token']:raise AppError('IMPACT_CHANGED','数据已变化，请重新预览后确认。',409)
         versions=[]
         with store.session() as s:

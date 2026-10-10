@@ -5,7 +5,7 @@ services:
     image: local-knowledge-qa-api:v1
     environment:
       DATA_ROOT: /data
-      HOST_DATA_PATH: ${DATA_PATH:-./data}
+      HOST_DATA_PATH: ${HOST_DATA_PATH:-${DATA_PATH:-./data}}
     volumes:
       - ${DATA_PATH:-./data}:/data
     mem_limit: 768m

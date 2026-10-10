@@ -35,7 +35,7 @@ class Provider:
     def close(self): self.client.close()
 
     def failure(self, response=None):
-        status = response.status_code if response else None
+        status = response.status_code if response is not None else None
         # Never surface provider bodies, exception strings, URL credentials or authorization.
         reason = {401:'密钥无效或已失效。', 403:'服务拒绝访问，请检查密钥权限。', 404:'模型或接口不存在，请检查模型名和地址。', 429:'请求额度或频率受限，请稍后重试。'}.get(status, '模型服务无法连接或响应异常，请检查服务、网络和配置。')
         raise AppError('MODEL_SERVICE', reason, 502, status in (429,502,503,504) or status is None)
@@ -84,11 +84,12 @@ class Provider:
                     if count>2*1024*1024: raise ValueError()
                     event=json.loads(line)
                     if event.get('error'): self.failure()
+                    if c['mode']=='api' and not event.get('choices'):continue
                     text=event.get('message',{}).get('content','') if c['mode']=='local' else event['choices'][0].get('delta',{}).get('content','')
                     if text: yield text
                     if c['mode']=='local' and event.get('done'): return
         except AppError: raise
-        except (httpx.HTTPError,ValueError,KeyError,TypeError): self.failure()
+        except (httpx.HTTPError,ValueError,KeyError,TypeError,IndexError): self.failure()
 
     def models(self):
         try:

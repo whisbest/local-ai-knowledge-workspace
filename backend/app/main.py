@@ -3,6 +3,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, field_validator
 from .core import Store, Record, Job, AppError, dump, load, record_data, job_data, now
 
@@ -23,6 +24,7 @@ def create_app(root=None, worker=True):
         store.recover()
         from .worker import Worker
         runner=Worker(store)
+        store.worker_runner=runner
         if worker: runner.start()
         yield
         if worker: runner.stop()
@@ -34,6 +36,9 @@ def create_app(root=None, worker=True):
     async def local_requests(request: Request, call_next):
         if request.method not in ('GET','HEAD','OPTIONS'):
             origin = request.headers.get('origin')
+            if request.headers.get('sec-fetch-site')=='cross-site':return JSONResponse({'code':'ORIGIN','message':'拒绝跨站修改请求。'},status_code=403)
+            if request.headers.get('host','').split(':')[0] not in ('localhost','127.0.0.1','testserver','api'):
+                return JSONResponse({'code':'HOST','message':'只能从本机访问。'},status_code=403)
             if origin and origin != str(request.base_url).rstrip('/'):
                 return JSONResponse({'code':'ORIGIN','message':'请求来源不匹配。'},status_code=403)
         with store.gate:
@@ -46,6 +51,11 @@ def create_app(root=None, worker=True):
     @app.exception_handler(AppError)
     async def error_handler(request, e):
         return JSONResponse({'code':e.code,'message':e.message,'retryable':e.retryable},status_code=e.status)
+
+    @app.exception_handler(RequestValidationError)
+    async def input_error(request,e):
+        # Pydantic errors normally echo submitted values, which can include a supplied key.
+        return JSONResponse({'code':'INPUT','message':'输入格式不合法，请检查必填项、名称和长度。','retryable':False},status_code=422)
 
     @app.get('/api/health')
     def health(): return {'status':'ok','maintenance':store.locked}
@@ -93,7 +103,7 @@ def create_app(root=None, worker=True):
     def jobs(state:str='', documentId:str=''):
         with store.session() as s:
             q=s.query(Job)
-            if state: q=q.filter_by(state=state)
+            if state: q=q.filter(Job.state.in_(state.split(',')))
             if documentId: q=q.filter_by(target=documentId)
             return [job_data(r) for r in q.order_by(Job.created_at.desc())]
 
@@ -117,4 +127,6 @@ def create_app(root=None, worker=True):
     mount_backups(app,store)
     return app
 
-app = create_app()
+def application():
+    """Uvicorn factory avoids touching production data when tests import create_app."""
+    return create_app()
