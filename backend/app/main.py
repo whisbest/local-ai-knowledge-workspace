@@ -36,9 +36,12 @@ def create_app(root=None, worker=True):
             origin = request.headers.get('origin')
             if origin and origin != str(request.base_url).rstrip('/'):
                 return JSONResponse({'code':'ORIGIN','message':'请求来源不匹配。'},status_code=403)
-            if store.locked and not request.url.path.startswith('/api/restores/'):
-                return JSONResponse({'code':'MAINTENANCE','message':'数据维护中，请稍后再试。'},status_code=423)
-        return await call_next(request)
+        with store.gate:
+            if store.locked and request.url.path!='/api/health':return JSONResponse({'code':'MAINTENANCE','message':'数据维护中，请稍后再试。'},status_code=423)
+            store.request_count+=1
+        try:return await call_next(request)
+        finally:
+            with store.gate:store.request_count-=1
 
     @app.exception_handler(AppError)
     async def error_handler(request, e):
@@ -110,6 +113,8 @@ def create_app(root=None, worker=True):
     mount_chat(app,store)
     from .data_service import mount_data
     mount_data(app,store)
+    from .backups import mount_backups
+    mount_backups(app,store)
     return app
 
 app = create_app()

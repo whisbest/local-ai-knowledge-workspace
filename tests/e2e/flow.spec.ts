@@ -21,3 +21,7 @@ test('homepage forwards exactly one question with selected scope and stats link'
  await page.reload();await expect(page.locator('.message.user')).toHaveCount(1);expect((await (await request.get('/api/test-calls')).json()).calls).toBe(before+1);
  await page.goto('/');await page.locator('.stat').filter({hasText:'可检索'}).click();await expect(page).toHaveURL(/status=ready/);await expect(page.getByLabel('文档状态筛选')).toHaveValue('ready');
 });
+test('backup download validate preview and confirmed overwrite preserves documents',async({page,request})=>{
+ const doc=(await (await request.get('/api/documents')).json()).items[0];await page.goto('/settings?section=data');await page.getByRole('button',{name:'创建完整备份'}).click();await expect(page.getByRole('link',{name:'下载备份'})).toBeVisible();const backup=(await (await request.get('/api/backups')).json())[0];const data=await (await request.get('/api/backups/'+backup.id+'/download')).body();
+ await page.getByLabel('选择备份文件，先校验再确认').setInputFiles({name:'knowledge.zip',mimeType:'application/zip',buffer:data});await expect(page.getByRole('heading',{name:'恢复预览'})).toBeVisible();await expect(page.getByText('API 密钥与模型权重不会导入',{exact:false})).toBeVisible();page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'确认覆盖恢复'}).click();await expect(page.getByText('恢复成功。',{exact:false})).toBeVisible();expect((await request.get('/api/documents/'+doc.id+'/file')).ok()).toBeTruthy();
+});

@@ -88,7 +88,21 @@ class Store:
         self.current = self.root / 'state/current'
         self.locked = False
         self.model_lock = threading.RLock()
+        self.gate = threading.Lock()
+        self.request_count = 0
+        self.recover_files()
         self.initialize()
+
+    def recover_files(self):
+        journal=self.root/'state/recovery.json'
+        if not journal.exists():return
+        data=load(journal.read_text(encoding='utf8'));old=self.root/'state/rollback'/data['id']
+        if data['phase']!='committed' and old.exists():
+            if self.current.exists():
+                failed=self.root/'state/staging'/('failed-'+uid());self.current.rename(failed)
+            old.rename(self.current)
+        elif not self.current.exists():raise RuntimeError('恢复日志存在但当前数据不存在，请保留数据并检查恢复前备份。')
+        journal.unlink()
 
     def initialize(self):
         for relative in ['state/current/documents', 'state/current/parsed', 'state/staging', 'state/rollback', 'secrets', 'backups', 'logs']:
@@ -135,6 +149,11 @@ class Store:
                 if message:message.state='interrupted'
 
     def claim(self, kind=None):
+        with self.gate:
+            if self.locked:return None
+            return self._claim(kind)
+
+    def _claim(self, kind=None):
         with self.engine.connect() as conn:
             conn.exec_driver_sql('BEGIN IMMEDIATE')
             row = conn.execute(text('SELECT id FROM jobs WHERE state=:state' + (' AND kind=:kind' if kind else '') + ' ORDER BY created_at LIMIT 1'), {'state':'queued', 'kind':kind}).first()

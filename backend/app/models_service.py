@@ -27,13 +27,13 @@ def config_for(store, id, purpose=None):
 def provider_for(store, id, purpose=None):
     c=config_for(store,id,purpose)
     path=store.root/'secrets'/c['id']
-    key=path.read_text(encoding='utf8') if path.is_file() else None
+    key=path.read_text(encoding='utf8') if path.is_file() and not c.get('restored_without_key') else None
     return Provider(c,key,getattr(store,'provider_transport',None))
 
 
 def public_config(store, r):
     c=record_data(r)
-    c['key_present']=(store.root/'secrets'/r.id).is_file()
+    c['key_present']=(store.root/'secrets'/r.id).is_file() and not c.get('restored_without_key')
     c.pop('secret_ref',None)
     return c
 
