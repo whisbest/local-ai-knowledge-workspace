@@ -202,6 +202,18 @@ def mount_documents(app,store):
                 d=require(s,old.target,'document');v=require(s,load(d.payload)['current_version_id'],'version');j=new_job(s,d,v,old.kind);j.attempt=old.attempt+1
             return job_data(j)
 
+    @router.delete('/jobs/{id}')
+    def delete_job(id:str):
+        with store.session() as s:
+            job=s.get(Job,id)
+            if not job:raise AppError('NOT_FOUND','任务不存在。',404)
+            if job.kind not in ('process','pull'):
+                raise AppError('JOB_DELETE_UNSUPPORTED','该类型任务不能删除，只能保留在对应记录中。',409)
+            if job.state not in ('completed','failed','interrupted','cancelled'):
+                raise AppError('JOB_ACTIVE','任务仍在执行或排队，请先取消任务后再删除。',409)
+            s.delete(job)
+        return {'deleted':True,'id':id}
+
     @router.post('/jobs/{id}/cancel')
     def cancel(id:str):
         with store.session() as s:

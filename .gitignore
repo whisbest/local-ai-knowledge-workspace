@@ -7,6 +7,21 @@ dist/
 __pycache__/
 .pytest_cache/
 .env
-*.log
 test-results/
 *.tsbuildinfo
+*.log
+# Personal files and local credentials
+简历*
+个人简历*
+resume*
+Resume*
+*.key
+*.pem
+# Local model and container artifacts
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.onnx
+docker-data/
+ollama-models/

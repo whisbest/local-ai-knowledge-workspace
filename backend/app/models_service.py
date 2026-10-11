@@ -62,6 +62,30 @@ def mount_models(app,store):
         except Exception:
             keypath.unlink(missing_ok=True);raise
 
+    @router.delete('/model-configs/{id}')
+    def remove(id:str):
+        """Remove an unused saved model configuration without touching model weights."""
+        secret_path=store.root/'secrets'/id
+        with store.session() as s:
+            config=s.get(Record,id)
+            if not config or config.kind!='model':
+                raise AppError('NOT_FOUND','模型配置不存在。',404)
+            values=load(config.payload)
+            preferences=load(s.get(Record,'preferences').payload)
+            defaults=[purpose for purpose in ('chat','embedding') if preferences.get('default_'+purpose)==id]
+            if defaults:
+                names='、'.join('回答模型' if purpose=='chat' else '向量模型' for purpose in defaults)
+                raise AppError('MODEL_IN_USE',f'该配置正在作为默认{names}，请先切换默认配置后再删除。',409)
+            # Active/building indexes still need this configuration for retrieval or completion.
+            for index in s.query(Record).filter(Record.kind=='index',Record.state.in_(['active','building'])):
+                if load(index.payload).get('model_config_id')!=id:continue
+                document=s.get(Record,index.parent_id)
+                if document and document.kind=='document' and document.state!='deleted':
+                    raise AppError('MODEL_IN_USE','该配置仍被可用索引使用，请先清理或重建相关索引。',409)
+            s.delete(config)
+        secret_path.unlink(missing_ok=True)
+        return {'deleted':True,'id':id,'name':values.get('name') or values.get('model')}
+
     @router.delete('/model-configs/{id}/key')
     def remove_key(id:str):
         config_for(store,id)
