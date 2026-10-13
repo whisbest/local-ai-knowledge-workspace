@@ -7,6 +7,9 @@ dist/
 __pycache__/
 .pytest_cache/
 .env
+.env.*
+!.env.example
+!.env.multiuser.example
 test-results/
 *.tsbuildinfo
 *.log
@@ -15,6 +18,19 @@ test-results/
 个人简历*
 resume*
 Resume*
+*简历*
+论文/
+.resume*/
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.vhd
+*.vhdx
+*.iso
 *.key
 *.pem
 # Local model and container artifacts
@@ -23,5 +39,11 @@ Resume*
 *.bin
 *.pt
 *.onnx
+*.pth
+*.ckpt
+*.model
+*.onnx_data
 docker-data/
 ollama-models/
+.ollama/
+models/

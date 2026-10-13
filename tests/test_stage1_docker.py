@@ -1,11 +1,12 @@
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import httpx
 
 ROOT=Path(__file__).resolve().parents[1]
-DOCKER=Path('C:/Users/86178/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe')
+DOCKER=Path(shutil.which('docker') or str(Path(os.environ.get('LOCALAPPDATA',''))/'Programs/DockerDesktop/resources/bin/docker.exe'))
 
 def test_real_compose_data_survives_container_recreation(tmp_path):
     env=dict(os.environ,DATA_PATH=str(tmp_path).replace('\\','/'),APP_PORT='18766')

@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Link,useNavigate} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
-import {api} from './api';
+import {api,multiuser} from './api';
 import {states} from './Documents';
 import Icon from './Icons';
 
@@ -20,7 +20,7 @@ export default function Home(){
   const kbs=useQuery({queryKey:['kbs'],queryFn:()=>api('/knowledge-bases')});
   const selected=kb??settings.data?.default_kb??'';
   const chatModel=models.data?.find((m:any)=>m.id===settings.data?.default_chat);
-  if(q.isError)return <section className="empty"><Icon name="alert"/><h1>无法连接本地服务</h1><p>请运行启动脚本，然后刷新页面。</p><button onClick={()=>q.refetch()}>重新连接</button></section>;
+  if(q.isError)return <section className="empty"><Icon name="alert"/><h1>{multiuser?'无法连接服务':'无法连接本地服务'}</h1><p>请运行启动脚本，然后刷新页面。</p><button onClick={()=>q.refetch()}>重新连接</button></section>;
   return <>
     <header className="page-heading home-heading"><div><h1>让知识，随问随得。</h1><p>整理你的资料，从每一次提问开始连接知识。</p></div><Link className="button secondary" to="/knowledge"><Icon name="plus"/>导入资料</Link></header>
     <section className="panel quick">

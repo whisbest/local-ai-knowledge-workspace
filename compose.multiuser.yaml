@@ -1,0 +1,106 @@
+name: lkq-multiuser
+x-config: &config
+  MULTIUSER_DATABASE_URL: postgresql+psycopg://workspace:${MULTIUSER_DB_PASSWORD:?Prepare configuration first}@db:5432/workspace
+  MULTIUSER_DATA_ROOT: /workspace-data
+  MULTIUSER_MASTER_KEY: ${MULTIUSER_MASTER_KEY:?Prepare fixed master key first}
+  MULTIUSER_HOSTS: ${MULTIUSER_HOSTS:-localhost,127.0.0.1}
+  MULTIUSER_ORIGINS: ${MULTIUSER_ORIGINS:-http://127.0.0.1:18770,http://localhost:18770}
+  MULTIUSER_SECURE_COOKIE: ${MULTIUSER_SECURE_COOKIE:-false}
+  MULTIUSER_PLATFORM_HOSTS: ${MULTIUSER_PLATFORM_HOSTS:-host.docker.internal,ollama}
+  MULTIUSER_UPLOAD_BYTES: ${MULTIUSER_UPLOAD_BYTES:-67108864}
+  MULTIUSER_BATCH_FILES: ${MULTIUSER_BATCH_FILES:-20}
+  MULTIUSER_STORAGE_BYTES: ${MULTIUSER_STORAGE_BYTES:-1073741824}
+  MULTIUSER_DOCUMENTS: ${MULTIUSER_DOCUMENTS:-100}
+  MULTIUSER_PENDING_JOBS: ${MULTIUSER_PENDING_JOBS:-20}
+  MULTIUSER_GLOBAL_PENDING: ${MULTIUSER_GLOBAL_PENDING:-100}
+  MULTIUSER_API_CONCURRENCY: ${MULTIUSER_API_CONCURRENCY:-2}
+  MULTIUSER_LOCAL_CONCURRENCY: ${MULTIUSER_LOCAL_CONCURRENCY:-1}
+  MULTIUSER_PLATFORM_CALLS: ${MULTIUSER_PLATFORM_CALLS:-1000}
+  MULTIUSER_PARSE_SECONDS: ${MULTIUSER_PARSE_SECONDS:-30}
+  MULTIUSER_REGISTRATION_ENABLED: ${MULTIUSER_REGISTRATION_ENABLED:-false}
+  MULTIUSER_MAIL_BACKEND: ${MULTIUSER_MAIL_BACKEND:-disabled}
+  MULTIUSER_SMTP_HOST: ${MULTIUSER_SMTP_HOST:-}
+  MULTIUSER_SMTP_PORT: ${MULTIUSER_SMTP_PORT:-465}
+  MULTIUSER_SMTP_SECURITY: ${MULTIUSER_SMTP_SECURITY:-ssl}
+  MULTIUSER_SMTP_USERNAME: ${MULTIUSER_SMTP_USERNAME:-}
+  MULTIUSER_SMTP_PASSWORD: ${MULTIUSER_SMTP_PASSWORD:-}
+  MULTIUSER_MAIL_FROM: ${MULTIUSER_MAIL_FROM:-}
+services:
+  db:
+    image: postgres:17-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_USER: workspace
+      POSTGRES_DB: workspace
+      POSTGRES_PASSWORD: ${MULTIUSER_DB_PASSWORD}
+    volumes:
+      - multiuser_pg:/var/lib/postgresql/data
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U workspace -d workspace"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.multiuser
+    image: local-knowledge-qa-api:v2
+    pull_policy: never
+    environment: *config
+    command: [python, -m, app.multiuser.migrate_entry]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    image: local-knowledge-qa-api:v2
+    pull_policy: never
+    environment: *config
+    volumes:
+      - multiuser_files:/workspace-data
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    mem_limit: 1024m
+    cpus: 2
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  worker:
+    image: local-knowledge-qa-api:v2
+    pull_policy: never
+    environment: *config
+    command: [python, -m, app.multiuser.worker_entry]
+    volumes:
+      - multiuser_files:/workspace-data
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    mem_limit: 1024m
+    cpus: 2
+    stop_grace_period: 240s
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.multiuser
+    image: local-knowledge-qa-web:v2
+    pull_policy: never
+    ports:
+      - 127.0.0.1:${MULTIUSER_PORT:-18770}:80
+    mem_limit: 128m
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  multiuser_pg:
+  multiuser_files:

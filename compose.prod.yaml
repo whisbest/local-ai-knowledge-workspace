@@ -1,0 +1,21 @@
+# Base compose.multiuser.yaml + this override. Set DOMAIN/origins before starting.
+services:
+  web:
+    ports: !reset []
+  edge:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      DOMAIN: ${DOMAIN:?Set your domain and matching MULTIUSER_HOSTS/ORIGINS}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+volumes:
+  caddy_data:
+  caddy_config:

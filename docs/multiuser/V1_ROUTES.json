@@ -1,0 +1,267 @@
+[
+  {
+    "module": "backups.py",
+    "method": "get",
+    "path": "/backups"
+  },
+  {
+    "module": "backups.py",
+    "method": "post",
+    "path": "/backups"
+  },
+  {
+    "module": "backups.py",
+    "method": "get",
+    "path": "/backups/{id}/download"
+  },
+  {
+    "module": "backups.py",
+    "method": "post",
+    "path": "/restores/validate"
+  },
+  {
+    "module": "backups.py",
+    "method": "post",
+    "path": "/restores/commit"
+  },
+  {
+    "module": "backups.py",
+    "method": "get",
+    "path": "/restores/{id}"
+  },
+  {
+    "module": "chat.py",
+    "method": "get",
+    "path": "/conversations"
+  },
+  {
+    "module": "chat.py",
+    "method": "post",
+    "path": "/conversations"
+  },
+  {
+    "module": "chat.py",
+    "method": "patch",
+    "path": "/conversations/{id}"
+  },
+  {
+    "module": "chat.py",
+    "method": "delete",
+    "path": "/conversations/{id}"
+  },
+  {
+    "module": "chat.py",
+    "method": "get",
+    "path": "/conversations/{id}/messages"
+  },
+  {
+    "module": "chat.py",
+    "method": "post",
+    "path": "/conversations/{id}/generations"
+  },
+  {
+    "module": "chat.py",
+    "method": "get",
+    "path": "/generations/{id}"
+  },
+  {
+    "module": "chat.py",
+    "method": "get",
+    "path": "/generations/{id}/events"
+  },
+  {
+    "module": "chat.py",
+    "method": "post",
+    "path": "/generations/{id}/stop"
+  },
+  {
+    "module": "chat.py",
+    "method": "post",
+    "path": "/generations/{id}/regenerate"
+  },
+  {
+    "module": "chat.py",
+    "method": "get",
+    "path": "/generations/{id}/sources"
+  },
+  {
+    "module": "data_service.py",
+    "method": "get",
+    "path": "/usage"
+  },
+  {
+    "module": "data_service.py",
+    "method": "post",
+    "path": "/clear/preview"
+  },
+  {
+    "module": "data_service.py",
+    "method": "post",
+    "path": "/clear"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/documents"
+  },
+  {
+    "module": "documents.py",
+    "method": "post",
+    "path": "/documents/upload"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/documents/{id}"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/documents/{id}/file"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/documents/{id}/parsed"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/documents/{id}/chunks"
+  },
+  {
+    "module": "documents.py",
+    "method": "post",
+    "path": "/documents/{id}/reprocess"
+  },
+  {
+    "module": "documents.py",
+    "method": "delete",
+    "path": "/documents/{id}"
+  },
+  {
+    "module": "documents.py",
+    "method": "get",
+    "path": "/knowledge-bases/{id}/impact"
+  },
+  {
+    "module": "documents.py",
+    "method": "delete",
+    "path": "/knowledge-bases/{id}"
+  },
+  {
+    "module": "documents.py",
+    "method": "post",
+    "path": "/jobs/{id}/retry"
+  },
+  {
+    "module": "documents.py",
+    "method": "delete",
+    "path": "/jobs/{id}"
+  },
+  {
+    "module": "documents.py",
+    "method": "post",
+    "path": "/jobs/{id}/cancel"
+  },
+  {
+    "module": "indexes.py",
+    "method": "get",
+    "path": "/indexes/impact"
+  },
+  {
+    "module": "indexes.py",
+    "method": "post",
+    "path": "/indexes/rebuild"
+  },
+  {
+    "module": "indexes.py",
+    "method": "post",
+    "path": "/retrieval"
+  },
+  {
+    "module": "indexes.py",
+    "method": "post",
+    "path": "/indexes/clear"
+  },
+  {
+    "module": "main.py",
+    "method": "get",
+    "path": "/api/health"
+  },
+  {
+    "module": "main.py",
+    "method": "get",
+    "path": "/api/settings"
+  },
+  {
+    "module": "main.py",
+    "method": "put",
+    "path": "/api/settings"
+  },
+  {
+    "module": "main.py",
+    "method": "get",
+    "path": "/api/knowledge-bases"
+  },
+  {
+    "module": "main.py",
+    "method": "post",
+    "path": "/api/knowledge-bases"
+  },
+  {
+    "module": "main.py",
+    "method": "patch",
+    "path": "/api/knowledge-bases/{id}"
+  },
+  {
+    "module": "main.py",
+    "method": "get",
+    "path": "/api/jobs"
+  },
+  {
+    "module": "main.py",
+    "method": "get",
+    "path": "/api/dashboard"
+  },
+  {
+    "module": "models_service.py",
+    "method": "get",
+    "path": "/model-configs"
+  },
+  {
+    "module": "models_service.py",
+    "method": "post",
+    "path": "/model-configs"
+  },
+  {
+    "module": "models_service.py",
+    "method": "delete",
+    "path": "/model-configs/{id}"
+  },
+  {
+    "module": "models_service.py",
+    "method": "delete",
+    "path": "/model-configs/{id}/key"
+  },
+  {
+    "module": "models_service.py",
+    "method": "put",
+    "path": "/model-configs/{id}/key"
+  },
+  {
+    "module": "models_service.py",
+    "method": "post",
+    "path": "/model-configs/{id}/test"
+  },
+  {
+    "module": "models_service.py",
+    "method": "get",
+    "path": "/local-models"
+  },
+  {
+    "module": "models_service.py",
+    "method": "post",
+    "path": "/local-models/pull"
+  }
+]

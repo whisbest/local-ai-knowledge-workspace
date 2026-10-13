@@ -1,8 +1,9 @@
 import os,sys,json,time,subprocess
+import shutil
 from pathlib import Path
 import httpx
 ROOT=Path(__file__).resolve().parents[1]
-DOCKER=Path('C:/Users/86178/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe')
+DOCKER=Path(shutil.which('docker') or str(Path(os.environ.get('LOCALAPPDATA',''))/'Programs/DockerDesktop/resources/bin/docker.exe'))
 
 def test_scripts_container_persistence_real_offline_import_and_qa(tmp_path):
     env=dict(os.environ,DATA_PATH=str(tmp_path).replace('\\','/'),APP_PORT='18769');env['PATH']=str(DOCKER.parent)+os.pathsep+env['PATH']

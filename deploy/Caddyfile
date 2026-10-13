@@ -1,0 +1,9 @@
+{$DOMAIN} {
+    encode gzip
+    reverse_proxy web:80 {
+        flush_interval -1
+        header_up -X-Forwarded-For
+        header_up -X-Forwarded-Host
+        header_up -X-Forwarded-Proto
+    }
+}

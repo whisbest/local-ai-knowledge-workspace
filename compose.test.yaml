@@ -1,0 +1,20 @@
+name: lkq-multiuser-test
+services:
+  db:
+    image: postgres:17-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_USER: workspace_test
+      POSTGRES_DB: workspace_test
+      POSTGRES_PASSWORD: ${MULTIUSER_TEST_DB_PASSWORD:?Run prepare-multiuser-test.py first}
+    ports:
+      - 127.0.0.1:55433:5432
+    volumes:
+      - multiuser_test_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U workspace_test -d workspace_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  multiuser_test_pg:

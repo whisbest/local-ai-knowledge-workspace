@@ -1,6 +1,7 @@
 """Stage 0 gates: real Docker, Ollama and persistent SQLite, no mock/skip."""
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import time
@@ -10,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 DOCKER = Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs/DockerDesktop/resources/bin/docker.exe'
 if not DOCKER.exists():
-    DOCKER = Path('C:/Users/86178/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe')
+    DOCKER = Path(shutil.which('docker') or 'docker')
 IMAGE = 'python:3.11-slim'
 
 

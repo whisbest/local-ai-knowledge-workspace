@@ -27,3 +27,12 @@ starlette==1.7.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.54.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.11
+tzdata==2026.5
+psutil==7.2.2

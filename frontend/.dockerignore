@@ -1,3 +1,7 @@
 node_modules
 dist
 test-results
+.env*
+.runtime
+*.key
+*.pem
